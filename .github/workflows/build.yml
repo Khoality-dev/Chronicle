@@ -26,7 +26,7 @@ jobs:
 
       - name: Build exe
         run: |
-          pyinstaller --onefile --windowed --name Chronicle main.py
+          pyinstaller --onefile --windowed --name Chronicle --collect-metadata fastmcp --collect-metadata mcp main.py
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
