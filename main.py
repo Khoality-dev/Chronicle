@@ -1,6 +1,9 @@
 """Chronicle — system tray activity logger with MCP server."""
 
+import sys
+import os
 import threading
+import winreg
 
 import pystray
 from PIL import Image, ImageDraw
@@ -8,6 +11,36 @@ from PIL import Image, ImageDraw
 from storage import ActivityStorage
 from logger import ActivityLogger
 import mcp_server
+
+APP_NAME = "Chronicle"
+REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+
+def _get_exe_path() -> str:
+    """Return the path to the running executable."""
+    if getattr(sys, "frozen", False):
+        return sys.executable
+    return os.path.abspath(sys.argv[0])
+
+
+def is_startup_enabled() -> bool:
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ) as key:
+            winreg.QueryValueEx(key, APP_NAME)
+            return True
+    except FileNotFoundError:
+        return False
+
+
+def set_startup(enabled: bool):
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_SET_VALUE) as key:
+        if enabled:
+            winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, _get_exe_path())
+        else:
+            try:
+                winreg.DeleteValue(key, APP_NAME)
+            except FileNotFoundError:
+                pass
 
 
 def create_icon(color: str = "green") -> Image.Image:
@@ -42,6 +75,12 @@ def main():
             icon.title = "Chronicle (Running)"
         is_logging[0] = not is_logging[0]
 
+    def toggle_startup(icon, item):
+        set_startup(not is_startup_enabled())
+
+    def open_logs(icon, item):
+        os.startfile(str(storage.data_dir))
+
     def on_exit(icon, item):
         activity_logger.stop()
         icon.stop()
@@ -51,6 +90,8 @@ def main():
 
     menu = pystray.Menu(
         pystray.MenuItem(get_toggle_text, toggle_logging, default=True),
+        pystray.MenuItem("Open Logs", open_logs),
+        pystray.MenuItem("Run on Startup", toggle_startup, checked=lambda item: is_startup_enabled()),
         pystray.MenuItem("Exit", on_exit),
     )
 
