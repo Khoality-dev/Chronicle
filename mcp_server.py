@@ -28,6 +28,14 @@ def search_activity(query: str, start_date: str = "", end_date: str = "") -> str
 
 
 @mcp.tool
+def get_readable_activity(minutes: int = 30) -> str:
+    """Get recent activity in clean, readable form.
+    Interprets backspaces, merges typing sessions, and converts
+    Shift+letter shortcuts into actual characters."""
+    return _storage.get_readable(minutes)
+
+
+@mcp.tool
 def get_activity_summary(hours: int = 24) -> str:
     """Get raw activity logs from the last N hours.
     Returns timestamped events for the AI to summarize."""

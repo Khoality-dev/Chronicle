@@ -1,10 +1,12 @@
 """File-based activity storage — one text file per day."""
 
+import sys
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent / "logs"
+_base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
+DATA_DIR = _base / "logs"
 
 
 class ActivityStorage:
@@ -94,6 +96,137 @@ class ActivityStorage:
         if len(text) > 15000:
             text = text[:15000] + "\n... (truncated)"
         return text
+
+    def get_readable(self, minutes: int = 30) -> str:
+        """Get normalized, human-readable activity from the last N minutes.
+
+        Interprets raw keystrokes: [Backspace] removes previous char,
+        [Enter] becomes newline, Shift+X shortcuts become letters,
+        consecutive typing in the same window is merged.
+        """
+        raw = self.get_recent(minutes)
+        if raw == "No recent activity.":
+            return raw
+        return self._normalize(raw.split("\n"))
+
+    def _normalize(self, lines: list[str]) -> str:
+        """Process raw log lines into readable output."""
+        import re
+
+        result = []
+        # Pending typing buffer: (start_time, app, chars)
+        pending_time = ""
+        pending_app = ""
+        pending_chars: list[str] = []
+
+        line_re = re.compile(
+            r"^\[(\d{2}:\d{2}:\d{2})\] (\w+)"
+            r"(?: \[([^\]]*)\])?: (.*)$"
+        )
+
+        def flush_pending():
+            if not pending_chars:
+                return
+            text = self._interpret_keys(pending_chars)
+            if text.strip():
+                app_part = f" [{pending_app}]" if pending_app else ""
+                result.append(f"[{pending_time}] TYPED{app_part}: {text}")
+
+        for line in lines:
+            m = line_re.match(line)
+            if not m:
+                flush_pending()
+                pending_chars.clear()
+                result.append(line)
+                continue
+
+            timestamp, event_type, app, data = m.groups()
+            app = app or ""
+
+            if event_type == "TYPED":
+                if app != pending_app and pending_chars:
+                    flush_pending()
+                    pending_chars.clear()
+                if not pending_chars:
+                    pending_time = timestamp
+                    pending_app = app
+                pending_chars.append(data)
+
+            elif event_type == "SHORTCUT":
+                # Shift+X → treat as typed letter
+                if data.startswith("Shift+") and len(data) == 7:
+                    letter = data[6]
+                    if app != pending_app and pending_chars:
+                        flush_pending()
+                        pending_chars.clear()
+                    if not pending_chars:
+                        pending_time = timestamp
+                        pending_app = app
+                    pending_chars.append(letter)
+                else:
+                    flush_pending()
+                    pending_chars.clear()
+                    app_part = f" [{app}]" if app else ""
+                    result.append(f"[{timestamp}] SHORTCUT{app_part}: {data}")
+
+            else:
+                flush_pending()
+                pending_chars.clear()
+                result.append(line)
+
+        flush_pending()
+        return "\n".join(result)
+
+    @staticmethod
+    def _interpret_keys(chunks: list[str]) -> str:
+        """Interpret a list of raw typed chunks into final text.
+
+        Processes [Backspace], [Enter], [Tab], [Delete], etc.
+        """
+        buf: list[str] = []
+        cursor = 0  # index into buf where next char is inserted
+
+        for chunk in chunks:
+            i = 0
+            while i < len(chunk):
+                if chunk[i] == "[":
+                    end = chunk.find("]", i)
+                    if end != -1:
+                        tag = chunk[i:end + 1]
+                        i = end + 1
+                        if tag == "[Backspace]":
+                            if cursor > 0:
+                                cursor -= 1
+                                buf.pop(cursor)
+                        elif tag == "[Delete]":
+                            if cursor < len(buf):
+                                buf.pop(cursor)
+                        elif tag == "[Enter]":
+                            buf.insert(cursor, "\n")
+                            cursor += 1
+                        elif tag == "[Tab]":
+                            buf.insert(cursor, "\t")
+                            cursor += 1
+                        elif tag == "[Left]":
+                            if cursor > 0:
+                                cursor -= 1
+                        elif tag == "[Right]":
+                            if cursor < len(buf):
+                                cursor += 1
+                        elif tag == "[Home]":
+                            # Move to start of current line
+                            while cursor > 0 and buf[cursor - 1] != "\n":
+                                cursor -= 1
+                        elif tag == "[End]":
+                            while cursor < len(buf) and buf[cursor] != "\n":
+                                cursor += 1
+                        # Ignore [Esc], [PageUp], [PageDown], [Up], [Down]
+                        continue
+                buf.insert(cursor, chunk[i])
+                cursor += 1
+                i += 1
+
+        return "".join(buf)
 
     def _read_lines_after(self, path: Path, cutoff: datetime) -> list[str]:
         """Read lines from a file that have timestamps after the cutoff."""
