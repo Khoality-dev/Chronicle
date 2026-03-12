@@ -56,7 +56,16 @@ def main():
     mcp_server.init(storage)
 
     # Start MCP server in daemon thread
-    mcp_thread = threading.Thread(target=mcp_server.run_server, daemon=True)
+    def _run_mcp():
+        try:
+            mcp_server.run_server()
+        except Exception as e:
+            import traceback
+            err_path = storage.data_dir / "mcp_error.log"
+            with open(err_path, "w") as f:
+                traceback.print_exc(file=f)
+
+    mcp_thread = threading.Thread(target=_run_mcp, daemon=True)
     mcp_thread.start()
 
     # Start activity logger
