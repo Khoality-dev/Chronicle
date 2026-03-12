@@ -42,7 +42,7 @@ def get_activity_summary(hours: int = 24) -> str:
     return _storage.get_summary(hours)
 
 
-VERSION = "1.0.0"
+VERSION = "0.0.0-dev"
 
 
 def run_server(host: str = "127.0.0.1", port: int = 29172):

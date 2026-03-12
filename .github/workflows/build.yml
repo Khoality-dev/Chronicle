@@ -24,6 +24,12 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Set version from release tag
+        run: |
+          $version = "${{ github.event.release.tag_name }}".TrimStart("v")
+          (Get-Content mcp_server.py) -replace 'VERSION = ".*"', "VERSION = `"$version`"" | Set-Content mcp_server.py
+        shell: pwsh
+
       - name: Build exe
         run: |
           pyinstaller --onefile --windowed --name Chronicle --copy-metadata fastmcp --copy-metadata mcp --collect-submodules uvicorn --collect-submodules starlette --collect-submodules pystray --collect-submodules pynput --hidden-import mcp --hidden-import mcp.server --hidden-import mcp.server.sse --hidden-import mcp.types --hidden-import mcp.shared --hidden-import fastmcp --hidden-import fastmcp.server --hidden-import fastmcp.server.http --hidden-import fastmcp.tools --hidden-import fastmcp.utilities --exclude-module mcp.cli --exclude-module fastmcp.experimental main.py
