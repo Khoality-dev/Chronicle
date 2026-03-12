@@ -26,7 +26,7 @@ jobs:
 
       - name: Build exe
         run: |
-          python -m nuitka --onefile --windows-console-mode=disable --assume-yes-for-downloads --output-filename=Chronicle.exe --include-package=mcp --include-package=fastmcp --include-package=uvicorn --include-package=starlette --include-package=pystray --include-package=pynput main.py
+          python -m nuitka --onefile --windows-console-mode=disable --assume-yes-for-downloads --output-filename=Chronicle.exe --follow-imports --nofollow-import-to=mcp.cli --nofollow-import-to=fastmcp.experimental --nofollow-import-to=fastmcp.client --nofollow-import-to=typer --nofollow-import-to=openai main.py
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
