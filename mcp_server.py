@@ -48,17 +48,18 @@ VERSION = "1.0.0"
 def run_server(host: str = "127.0.0.1", port: int = 29172):
     """Run the MCP server with a health endpoint. Blocking — call from a daemon thread."""
     import uvicorn
-    from starlette.applications import Starlette
     from starlette.responses import JSONResponse
-    from starlette.routing import Route, Mount
+    from starlette.routing import Route
+    from fastmcp.server.http import create_sse_app
 
     async def health(request):
         return JSONResponse({"status": "ok", "version": VERSION})
 
-    sse_app = mcp.sse_app()
-    app = Starlette(routes=[
-        Route("/health", health),
-        Mount("/", app=sse_app),
-    ])
+    app = create_sse_app(
+        mcp,
+        message_path="/messages/",
+        sse_path="/sse",
+        routes=[Route("/health", health)],
+    )
 
     uvicorn.run(app, host=host, port=port, log_level="warning")
