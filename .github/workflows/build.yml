@@ -22,13 +22,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install "nuitka[onefile]"
+          pip install pyinstaller
 
       - name: Build exe
         run: |
-          python -m nuitka --onefile --windows-console-mode=disable --assume-yes-for-downloads --output-filename=Chronicle.exe --include-package=mcp --include-package=fastmcp --include-package=uvicorn --include-package=starlette --include-package=pystray --include-package=pynput main.py
+          pyinstaller --onefile --windowed --name Chronicle --copy-metadata fastmcp --copy-metadata mcp --collect-submodules mcp --collect-submodules fastmcp --collect-submodules uvicorn --collect-submodules starlette --hidden-import uvicorn.logging --hidden-import uvicorn.protocols.http.auto --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan.on main.py
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: Chronicle.exe
+          files: dist/Chronicle.exe
