@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install nuitka
+          pip install "nuitka[onefile]"
 
       - name: Build exe
         run: |
